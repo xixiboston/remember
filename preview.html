@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remember - 交互预览（含提前提醒）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: #C8E6C9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-window {
+            width: 900px;
+            height: 700px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #A5D6A7;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .bulb {
+            width: 40px;
+            height: 50px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .bulb-glass {
+            width: 32px;
+            height: 35px;
+            background: #FFF9C4;
+            border: 2px solid #FBC02D;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 4px;
+        }
+
+        .bulb-highlight {
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            left: 10px;
+        }
+
+        .bulb-base {
+            width: 20px;
+            height: 12px;
+            position: absolute;
+            bottom: 0;
+            left: 10px;
+        }
+
+        .bulb-base::before, .bulb-base::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 5px;
+            background: #999;
+            border: 1px solid #666;
+            left: 0;
+        }
+
+        .bulb-base::before { top: 0; }
+        .bulb-base::after { bottom: 0; }
+
+        .title { font-size: 24px; font-weight: bold; color: #333; }
+        .subtitle { font-size: 14px; color: #666; margin-left: 10px; margin-top: 5px; }
+
+        .toolbar {
+            background: #E8F5E9;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            margin: 10px;
+            border-radius: 4px;
+        }
+
+        .btn-add {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.1s;
+            box-shadow: 0 3px 0 #388E3C;
+        }
+
+        .btn-add:hover { background: #45a049; }
+
+        .btn-add:active {
+            transform: translateY(3px);
+            box-shadow: 0 0 0 #388E3C;
+        }
+
+        .filter-group { display: flex; gap: 5px; }
+
+        .filter-btn {
+            padding: 5px 12px;
+            border: 1px solid #ccc;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .filter-btn.active { background: #4CAF50; color: white; border-color: #4CAF50; }
+
+        .task-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 10px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .day-column {
+            flex: 1;
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .day-header {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            padding: 10px 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4CAF50;
+            text-align: center;
+        }
+
+        .day-header.today {
+            border-color: #f44336;
+            color: #f44336;
+        }
+
+        .day-header.tomorrow {
+            border-color: #2196F3;
+            color: #2196F3;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .task-item:hover { background: #F1F8E9; }
+        .task-item.selected { background: #DCEDC8; }
+
+        .task-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        .task-time { width: 100px; color: #666; font-size: 13px; }
+
+        .task-title {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .task-delay {
+            font-size: 12px;
+            color: #4CAF50;
+            margin-left: 5px;
+        }
+
+        .task-sound {
+            font-size: 12px;
+            margin-left: 5px;
+        }
+
+        .task-item.completed .task-title { color: #999; text-decoration: line-through; }
+        .task-item.overdue .task-time { color: #f44336; }
+
+        .status-bar {
+            background: #E8F5E9;
+            padding: 10px 15px;
+            font-size: 13px;
+            color: #2E7D32;
+            border-top: 1px solid #C8E6C9;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-bar.alert {
+            background: #FFF3E0;
+            color: #E65100;
+            animation: pulse 1s ease infinite;
+        }
+
+        .status-bar.sound {
+            background: #FFEBEE;
+            color: #C62828;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* 消息提醒弹窗 */
+        .message-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            border-left: 4px solid #FF9800;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 5000;
+            animation: slideIn 0.3s ease;
+            max-width: 300px;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .message-toast-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .message-toast-content {
+            color: #666;
+            font-size: 13px;
+        }
+
+        .message-toast-time {
+            color: #FF9800;
+            font-weight: bold;
+        }
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            min-width: 120px;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .context-menu-item:hover { background: #f0f0f0; }
+        .context-menu-divider { height: 1px; background: #eee; margin: 5px 0; }
+
+        .dialog-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .dialog {
+            background: white;
+            border-radius: 8px;
+            width: 420px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 25px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+        }
+
+        .dialog-title { font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+
+        .form-group { margin-bottom: 15px; }
+        .form-label { display: block; font-size: 13px; color: #666; margin-bottom: 5px; }
+
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .form-textarea { height: 60px; resize: none; }
+
+        .time-inputs { display: flex; gap: 10px; align-items: center; }
+        .time-input { width: 120px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+
+        .repeat-options, .delay-options, .sound-options {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .option-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .sound-file-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            align-items: center;
+        }
+
+        .sound-file-input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            background: #f5f5f5;
+        }
+
+        .btn-browse {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .dialog-btns {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        .btn-cancel {
+            padding: 10px 25px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-save {
+            padding: 10px 25px;
+            border: none;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .reminder-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+
+        .reminder-dialog {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 8px;
+            box-shadow: 0 5px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .reminder-bulb {
+            width: 50px;
+            height: 60px;
+            margin: 0 auto 15px;
+            position: relative;
+        }
+
+        .reminder-bulb .bulb-glass { width: 40px; height: 45px; left: 5px; background: #FFF9C4; border-color: #FBC02D; }
+        .reminder-bulb .bulb-highlight { width: 12px; height: 14px; left: 12px; top: 10px; }
+        .reminder-bulb .bulb-base { width: 26px; left: 12px; height: 16px; }
+
+        .reminder-title { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
+
+        .reminder-time-info {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .reminder-time-info .actual {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .reminder-task { font-size: 15px; color: #333; margin-bottom: 20px; }
+
+        .reminder-btns { display: flex; gap: 10px; justify-content: center; }
+
+        /* 小鸡问候弹窗 */
+        .chick-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 248, 225, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 4000;
+        }
+
+        .chick-dialog {
+            background: linear-gradient(135deg, #FFFDE7 0%, #FFF8E1 100%);
+            padding: 50px 60px;
+            border-radius: 30px;
+            box-shadow: 0 15px 50px rgba(255, 193, 7, 0.3);
+            text-align: center;
+            animation: cuteBounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: 4px solid #FFE082;
+            position: relative;
+        }
+
+        .chick-dialog::before {
+            content: '✨';
+            position: absolute;
+            top: 20px;
+            left: 30px;
+            font-size: 24px;
+            animation: twinkle 1.5s ease infinite;
+        }
+
+        .chick-dialog::after {
+            content: '✨';
+            position: absolute;
+            top: 30px;
+            right: 40px;
+            font-size: 20px;
+            animation: twinkle 1.5s ease infinite 0.5s;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        @keyframes cuteBounce {
+            0% { transform: scale(0) rotate(-10deg); opacity: 0; }
+            50% { transform: scale(1.1) rotate(5deg); }
+            70% { transform: scale(0.95) rotate(-3deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+
+        .chick-container {
+            width: 140px;
+            height: 140px;
+            margin: 0 auto 25px;
+            position: relative;
+            animation: wiggle 2s ease infinite;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+        }
+
+        /* 小鸡身体 */
+        .chick-body {
+            width: 90px;
+            height: 80px;
+            background: linear-gradient(145deg, #FFEB3B 0%, #FDD835 100%);
+            border-radius: 50%;
+            position: absolute;
+            bottom: 15px;
+            left: 25px;
+            border: 3px solid #F9A825;
+            box-shadow: inset -5px -5px 10px rgba(249, 168, 37, 0.3);
+        }
+
+        /* 小鸡头 */
+        .chick-head {
+            width: 70px;
+            height: 65px;
+            background: linear-gradient(145deg, #FFEB3B 0%, #FDD835 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 20px;
+            left: 35px;
+            border: 3px solid #F9A825;
+            box-shadow: inset -3px -3px 8px rgba(249, 168, 37, 0.3);
+        }
+
+        /* 眼睛 */
+        .chick-eye {
+            width: 14px;
+            height: 16px;
+            background: #2E2E2E;
+            border-radius: 50%;
+            position: absolute;
+            top: 38px;
+            animation: blink 3s ease infinite;
+        }
+
+        .chick-eye.left { left: 45px; }
+        .chick-eye.right { left: 81px; }
+
+        @keyframes blink {
+            0%, 45%, 55%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.1); }
+        }
+
+        /* 眼睛高光 */
+        .chick-eye::after {
+            content: '';
+            width: 5px;
+            height: 5px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 3px;
+            left: 3px;
+        }
+
+        /* 嘴巴 */
+        .chick-beak {
+            width: 16px;
+            height: 12px;
+            background: #FF6F00;
+            border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+            position: absolute;
+            top: 52px;
+            left: 62px;
+            border: 2px solid #E65100;
+        }
+
+        /* 腮红 */
+        .chick-blush {
+            width: 16px;
+            height: 10px;
+            background: linear-gradient(145deg, #FF8A80 0%, #FFAB91 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 50px;
+            opacity: 0.8;
+        }
+
+        .chick-blush.left { left: 38px; }
+        .chick-blush.right { left: 86px; }
+
+        /* 翅膀 */
+        .chick-wing {
+            width: 30px;
+            height: 40px;
+            background: linear-gradient(145deg, #FDD835 0%, #FBC02D 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 65px;
+            border: 2px solid #F9A825;
+        }
+
+        .chick-wing.left { left: 18px; transform: rotate(-25deg); }
+        .chick-wing.right { right: 18px; transform: rotate(25deg); }
+
+        /* 脚 */
+        .chick-foot {
+            width: 10px;
+            height: 15px;
+            background: #FF6F00;
+            position: absolute;
+            bottom: 5px;
+            border-radius: 0 0 5px 5px;
+            border: 2px solid #E65100;
+        }
+
+        .chick-foot.left { left: 50px; }
+        .chick-foot.right { left: 80px; }
+
+        /* 头顶呆毛 */
+        .chick-hair {
+            width: 8px;
+            height: 15px;
+            background: #FDD835;
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            left: 66px;
+            border: 2px solid #F9A825;
+            transform: rotate(-15deg);
+        }
+
+        /* 对话气泡 */
+        .chick-bubble {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 25px;
+            border: 3px solid #FFD54F;
+            margin-bottom: 25px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.2);
+        }
+
+        .chick-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-top: 12px solid #FFD54F;
+        }
+
+        .chick-bubble::before {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-top: 12px solid white;
+            z-index: 1;
+        }
+
+        .chick-message {
+            font-size: 20px;
+            color: #5D4037;
+            font-weight: bold;
+            line-height: 1.5;
+        }
+
+        .chick-btn {
+            background: linear-gradient(145deg, #FFEB3B 0%, #FDD835 100%);
+            border: 3px solid #FBC02D;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 17px;
+            cursor: pointer;
+            color: #5D4037;
+            font-weight: bold;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
+        }
+
+        .chick-btn:hover {
+            background: linear-gradient(145deg, #FDD835 0%, #FBC02D 100%);
+            transform: scale(1.08) translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 193, 7, 0.4);
+        }
+
+        .chick-btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-done {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .btn-later {
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            padding: 10px 25px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-window">
+        <div class="header">
+            <div class="bulb" onclick="demoReminder()">
+                <div class="bulb-glass"></div>
+                <div class="bulb-highlight"></div>
+                <div class="bulb-base"></div>
+            </div>
+            <span class="title" onclick="showChick()" style="cursor: pointer;">Remember</span>
+            <span class="subtitle">记住重要的事</span>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn-add" onclick="showAddDialog()">+ 新建任务</button>
+            <div class="filter-group">
+                <button class="filter-btn active" onclick="setFilter('pending', this)">待办</button>
+                <button class="filter-btn" onclick="setFilter('completed', this)">已完成</button>
+                <button class="filter-btn" onclick="setFilter('all', this)">全部</button>
+            </div>
+        </div>
+
+        <div class="task-list" id="taskList"></div>
+
+        <div class="status-bar" id="statusBar">待办任务: 0 个</div>
+    </div>
+
+    <!-- 消息提醒 Toast -->
+    <div class="message-toast" id="messageToast">
+        <div class="message-toast-title">📢 任务提醒</div>
+        <div class="message-toast-content">
+            「<span id="toastTaskTitle"></span>」将在 <span class="message-toast-time" id="toastTime"></span> 后到期
+        </div>
+    </div>
+
+    
+
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="editTask()">编辑</div>
+        <div class="context-menu-item" onclick="toggleComplete()">标记完成</div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="deleteTask()" style="color: #f44336;">删除</div>
+    </div>
+
+    <div class="dialog-overlay" id="dialogOverlay" onclick="if(event.target===this)closeDialog()">
+        <div class="dialog">
+            <div class="dialog-title" id="dialogTitle">添加任务</div>
+
+            <div class="form-group">
+                <label class="form-label">任务标题</label>
+                <input type="text" class="form-input" id="taskTitle" placeholder="输入任务标题...">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">描述 (可选)</label>
+                <textarea class="form-textarea" id="taskDesc" placeholder="添加详细描述..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">原定时间</label>
+                <div class="time-inputs">
+                    <input type="date" class="time-input" id="taskDate">
+                    <input type="time" class="time-input" id="taskTime">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">提前提醒 <span class="hint">（在到期时间之前提醒你）</span></label>
+                <div class="delay-options">
+                    <label class="option-label">
+                        <input type="radio" name="delay" value="0" checked>
+                        <span>不提前</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="delay" value="10">
+                        <span>10分钟前</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="delay" value="30">
+                        <span>30分钟前</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="delay" value="60">
+                        <span>1小时前</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">分类</label>
+                <div class="category-options">
+                    <label class="option-label">
+                        <input type="radio" name="category" value="life" checked>
+                        <span>🏠 生活</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="category" value="kids">
+                        <span>👶 孩子</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="category" value="work">
+                        <span>💼 工作</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">重复</label>
+                <div class="repeat-options">
+                    <label class="option-label">
+                        <input type="radio" name="repeat" value="none" checked>
+                        <span>不重复</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="repeat" value="daily">
+                        <span>每天</span>
+                    </label>
+                    <label class="option-label">
+                        <input type="radio" name="repeat" value="weekly">
+                        <span>每周</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">提醒音乐 🎵</label>
+                <div style="padding: 10px; background: #f5f5f5; border-radius: 4px; font-size: 14px; color: #666;">
+                    Taylor Swift - You Belong With Me
+                </div>
+            </div>
+
+            <div class="dialog-btns">
+                <button class="btn-cancel" onclick="closeDialog()">取消</button>
+                <button class="btn-save" onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="reminder-overlay" id="reminderOverlay">
+        <div class="reminder-dialog">
+            <div class="reminder-bulb">
+                <div class="bulb-glass"></div>
+                <div class="bulb-highlight"></div>
+                <div class="bulb-base"></div>
+            </div>
+            <div class="reminder-title">💡 该做任务了！</div>
+            <div class="reminder-time-info" id="reminderTimeInfo">
+                到期时间: 17:00
+            </div>
+            <div class="reminder-task" id="reminderTaskTitle">完成项目报告</div>
+            <div class="reminder-btns">
+                <button class="btn-done" onclick="markDoneFromReminder()">已完成</button>
+                <button class="btn-later" onclick="remindLater()">稍后提醒 (10分钟)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 小鸡问候弹窗 -->
+    <div class="chick-overlay" id="chickOverlay">
+        <div class="chick-dialog">
+            <div class="chick-bubble">
+                <div class="chick-message">咕咕~ 昨天的事<br>都完成了吗？ 🐥</div>
+            </div>
+            <div class="chick-container">
+                <div class="chick-hair"></div>
+                <div class="chick-head"></div>
+                <div class="chick-eye left"></div>
+                <div class="chick-eye right"></div>
+                <div class="chick-beak"></div>
+                <div class="chick-blush left"></div>
+                <div class="chick-blush right"></div>
+                <div class="chick-body"></div>
+                <div class="chick-wing left"></div>
+                <div class="chick-wing right"></div>
+                <div class="chick-foot left"></div>
+                <div class="chick-foot right"></div>
+            </div>
+            <button class="chick-btn" onclick="closeChick()">好哒，我看看 🌟</button>
+        </div>
+    </div>
+
+    <script>
+        let tasks = [
+            { id: 1, title: '完成项目报告', desc: '', date: '2026-03-31', time: '14:00', delay: 30, repeat: 'none', category: 'work', completed: false },
+            { id: 2, title: '每日运动30分钟', desc: '跑步或健身', date: '2026-03-31', time: '18:00', delay: 0, repeat: 'daily', category: 'life', completed: false },
+            { id: 3, title: '接孩子放学', desc: '', date: '2026-03-31', time: '16:00', delay: 10, repeat: 'daily', category: 'kids', completed: false },
+            { id: 4, title: '团队周会', desc: '', date: '2026-04-01', time: '09:00', delay: 10, repeat: 'weekly', category: 'work', completed: false },
+            { id: 5, title: '买 groceries', desc: '', date: '2026-03-31', time: '19:00', delay: 0, repeat: 'none', category: 'life', completed: true },
+            { id: 6, title: '带孩子看医生', desc: '年度体检', date: '2026-04-01', time: '10:30', delay: 0, repeat: 'none', category: 'kids', completed: false },
+            { id: 7, title: '交水电费', desc: '', date: '2026-04-01', time: '14:00', delay: 0, repeat: 'none', category: 'life', completed: false },
+        ];
+
+        let currentFilter = 'pending';
+        let selectedTaskId = null;
+        let editingTaskId = null;
+        let reminderTaskId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTasks();
+            setupContextMenu();
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('taskDate').value = today;
+            document.getElementById('taskTime').value = '09:00';
+
+            // 检查是否需要显示小鸡问候
+            checkAndShowChick();
+
+            // 启动提醒检查
+            startReminderCheck();
+        });
+
+        // 提醒检查
+        let checkedMessages = new Set();
+        let checkedSounds = new Set();
+
+        function startReminderCheck() {
+            setInterval(() => {
+                checkReminders();
+            }, 10000); // 每10秒检查一次
+        }
+
+        function checkReminders() {
+            const now = new Date();
+
+            tasks.forEach(task => {
+                if (task.completed) return;
+
+                const taskDateTime = new Date(task.date + 'T' + task.time);
+                // 提前提醒时间 = 到期时间 - 提前分钟数
+                const earlyMs = (task.delay || 0) * 60000;
+                const reminderTime = new Date(taskDateTime.getTime() - earlyMs);
+                const minutesUntilDue = (taskDateTime - now) / 60000; // 距离到期的分钟数
+                const minutesUntilReminder = (reminderTime - now) / 60000; // 距离提醒时间的分钟数
+
+                // 30分钟前 - 消息提醒（提前提醒时）
+                if (task.delay >= 30 && minutesUntilReminder > 29 && minutesUntilReminder <= 30) {
+                    const msgKey = `msg_${task.id}`;
+                    if (!checkedMessages.has(msgKey)) {
+                        checkedMessages.add(msgKey);
+                        showMessageAlert(task, Math.floor(minutesUntilDue));
+                    }
+                }
+
+                // 10分钟内 - 声音提醒（接近到期时）
+                if (minutesUntilDue > 0 && minutesUntilDue <= 10) {
+                    const soundKey = `sound_${task.id}_${Math.floor(minutesUntilDue / 2)}`;
+                    if (!checkedSounds.has(soundKey)) {
+                        checkedSounds.add(soundKey);
+                        playSoundAlert(task, Math.floor(minutesUntilDue));
+                    }
+                }
+            });
+        }
+
+        function showMessageAlert(task, minutes) {
+            // 显示 Toast 通知
+            const toast = document.getElementById('messageToast');
+            document.getElementById('toastTaskTitle').textContent = task.title;
+            document.getElementById('toastTime').textContent = minutes + '分钟';
+            toast.style.display = 'block';
+
+            // 更新状态栏
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = `📢 提醒：「${task.title}」将在${minutes}分钟后到期`;
+            statusBar.classList.add('alert');
+
+            // 3秒后隐藏 toast
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 5000);
+
+            // 30分钟提醒不播放声音，只显示消息
+        }
+
+        function playSoundAlert(task, minutes) {
+            // 更新状态栏
+            const statusBar = document.getElementById('statusBar');
+            statusBar.textContent = `🔔 任务「${task.title}」还有${minutes}分钟！`;
+            statusBar.classList.remove('alert');
+            statusBar.classList.add('sound');
+
+            // 播放提示音
+            playBeep();
+
+            // 5秒后恢复状态栏
+            setTimeout(() => {
+                statusBar.classList.remove('sound');
+                renderTasks();
+            }, 5000);
+        }
+
+        function playBeep() {
+            // 使用 Web Audio API 播放提示音
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.frequency.value = 800;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (e) {
+                console.log('无法播放声音:', e);
+            }
+        }
+
+        // 检查并显示小鸡问候
+        function checkAndShowChick() {
+            const lastVisit = localStorage.getItem('remember_last_visit');
+            const today = new Date().toISOString().split('T')[0];
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+            // 检查昨天是否有任务
+            const hasYesterdayTasks = tasks.some(t => t.date === yesterdayStr);
+
+            // 如果昨天访问过，且昨天有任务，且今天还没访问过
+            if (lastVisit === yesterdayStr && hasYesterdayTasks && lastVisit !== today) {
+                setTimeout(() => {
+                    showChick();
+                }, 500);
+            }
+
+            // 更新最后访问时间
+            localStorage.setItem('remember_last_visit', today);
+        }
+
+        function showChick() {
+            document.getElementById('chickOverlay').style.display = 'flex';
+        }
+
+        function closeChick() {
+            document.getElementById('chickOverlay').style.display = 'none';
+        }
+
+        // 默认音乐设置
+        const defaultMusic = "Taylor Swift - You Belong With Me.mp3";
+
+        function formatTime(date, time, delay) {
+            const taskDate = new Date(date + 'T' + time);
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+
+            let baseStr;
+            if (taskDate.toDateString() === today.toDateString()) {
+                baseStr = `今天 ${time}`;
+            } else if (taskDate.toDateString() === tomorrow.toDateString()) {
+                baseStr = `明天 ${time}`;
+            } else {
+                baseStr = `${date.slice(5)} ${time}`;
+            }
+            return baseStr;
+        }
+
+        function getActualTime(time, delay) {
+            const [hours, minutes] = time.split(':').map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes + delay);
+            return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        }
+
+        function renderTasks() {
+            const listEl = document.getElementById('taskList');
+            const statusEl = document.getElementById('statusBar');
+            listEl.innerHTML = '';
+
+            let filteredTasks = tasks;
+            if (currentFilter === 'pending') {
+                filteredTasks = tasks.filter(t => !t.completed);
+            } else if (currentFilter === 'completed') {
+                filteredTasks = tasks.filter(t => t.completed);
+            }
+
+            // 获取纽约时间
+            const now = new Date();
+            const nyTimeString = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+            const nyTime = new Date(nyTimeString);
+
+            // 格式化为 YYYY-MM-DD
+            const nyYear = nyTime.getFullYear();
+            const nyMonth = String(nyTime.getMonth() + 1).padStart(2, '0');
+            const nyDay = String(nyTime.getDate()).padStart(2, '0');
+            const today = `${nyYear}-${nyMonth}-${nyDay}`;
+
+            // 明天
+            const tomorrow = new Date(nyTime);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowYear = tomorrow.getFullYear();
+            const tomorrowMonth = String(tomorrow.getMonth() + 1).padStart(2, '0');
+            const tomorrowDay = String(tomorrow.getDate()).padStart(2, '0');
+            const tomorrowStr = `${tomorrowYear}-${tomorrowMonth}-${tomorrowDay}`;
+
+            // 显示纽约时间
+            const nyDateStr = `${nyYear}年${nyMonth}月${nyDay}日`;
+            const nyTimeStr = nyTime.toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // 按分类分组渲染函数
+            const categories = {
+                'kids': { title: '孩子', icon: '👶', color: '#FFECB3' },
+                'work': { title: '工作', icon: '💼', color: '#E3F2FD' },
+                'life': { title: '生活', icon: '🏠', color: '#E8F5E9' }
+            };
+
+            function renderDayTasks(dayTasks, container) {
+                if (dayTasks.length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.style.cssText = 'text-align: center; color: #999; padding: 40px 20px;';
+                    emptyMsg.textContent = '暂无任务';
+                    container.appendChild(emptyMsg);
+                    return;
+                }
+
+                ['kids', 'work', 'life'].forEach(catKey => {
+                    const catTasks = dayTasks.filter(t => t.category === catKey);
+                    if (catTasks.length === 0) return;
+
+                    const catInfo = categories[catKey];
+                    const header = document.createElement('div');
+                    header.style.cssText = `
+                        background: ${catInfo.color};
+                        padding: 8px 12px;
+                        margin: 10px 0 5px 0;
+                        border-radius: 6px;
+                        font-size: 14px;
+                        font-weight: bold;
+                        color: #333;
+                        display: flex;
+                        align-items: center;
+                        gap: 6px;
+                    `;
+                    header.innerHTML = `<span style="font-size: 18px;">${catInfo.icon}</span> ${catInfo.title}`;
+                    container.appendChild(header);
+
+                    catTasks.sort((a, b) => {
+                        return new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time);
+                    });
+
+                    catTasks.forEach(task => {
+                        const taskDate = new Date(task.date + 'T' + task.time);
+                        const isOverdue = !task.completed && taskDate < now;
+
+                        let icon = '○';
+                        if (task.completed) icon = '✓';
+                        else if (isOverdue) icon = '⚠';
+
+                        let timeStr = task.time;
+
+                        let displayTitle = task.title;
+                        if (task.repeat === 'daily') displayTitle = '🔄 ' + displayTitle;
+                        else if (task.repeat === 'weekly') displayTitle = '📅 ' + displayTitle;
+
+                        let delayInfo = '';
+                        if (task.delay > 0) {
+                            delayInfo = `<span class="task-delay">(提前${task.delay}分)</span>`;
+                        }
+
+                        const item = document.createElement('div');
+                        item.className = `task-item ${task.completed ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}`;
+                        item.dataset.id = task.id;
+                        item.style.padding = '10px 8px';
+                        item.innerHTML = `
+                            <span class="task-icon" onclick="event.stopPropagation(); toggleTaskComplete(${task.id})" style="font-size: 14px;">${icon}</span>
+                            <span class="task-time" style="width: 50px; font-size: 12px;">${timeStr}</span>
+                            <span class="task-title" style="font-size: 13px;">${displayTitle}${delayInfo}</span>
+                        `;
+                        item.onclick = () => selectTask(task.id);
+                        item.ondblclick = () => showEditDialog(task.id);
+                        container.appendChild(item);
+                    });
+                });
+            }
+
+            // 左侧 - 今天（纽约时间）
+            const todayColumn = document.createElement('div');
+            todayColumn.className = 'day-column';
+            const todayHeader = document.createElement('div');
+            todayHeader.className = 'day-header today';
+            todayHeader.innerHTML = `📅 今天 <span style="font-size: 12px; font-weight: normal;">(${nyDateStr})</span>`;
+            todayColumn.appendChild(todayHeader);
+
+            const todayTasks = filteredTasks.filter(t => t.date === today);
+            renderDayTasks(todayTasks, todayColumn);
+            listEl.appendChild(todayColumn);
+
+            // 右侧 - 明天（纽约时间）
+            const tomorrowColumn = document.createElement('div');
+            tomorrowColumn.className = 'day-column';
+            const tomorrowHeader = document.createElement('div');
+            tomorrowHeader.className = 'day-header tomorrow';
+            const tomorrowDateStr = `${tomorrowMonth}月${tomorrowDay}日`;
+            tomorrowHeader.innerHTML = `📅 明天 <span style="font-size: 12px; font-weight: normal;">(${tomorrowDateStr})</span>`;
+            tomorrowColumn.appendChild(tomorrowHeader);
+
+            const tomorrowTasks = filteredTasks.filter(t => t.date === tomorrowStr);
+            renderDayTasks(tomorrowTasks, tomorrowColumn);
+            listEl.appendChild(tomorrowColumn);
+
+            const pendingCount = tasks.filter(t => !t.completed).length;
+            const statusText = currentFilter === 'pending' ? `待办: ${pendingCount} 个` :
+                              currentFilter === 'completed' ? `已完成: ${tasks.filter(t => t.completed).length} 个` :
+                              `全部: ${tasks.length} 个 (待办: ${pendingCount})`;
+            statusEl.innerHTML = `${statusText} <span style="margin-left: 20px; color: #666;">🌍 纽约时间: ${nyTimeStr}</span>`;
+        }
+
+        function setFilter(filter, btn) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderTasks();
+        }
+
+        function selectTask(id) {
+            selectedTaskId = id;
+            document.querySelectorAll('.task-item').forEach(item => {
+                item.classList.toggle('selected', parseInt(item.dataset.id) === id);
+            });
+        }
+
+        function toggleTaskComplete(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                renderTasks();
+            }
+        }
+
+        function toggleComplete() {
+            if (selectedTaskId) {
+                toggleTaskComplete(selectedTaskId);
+                hideContextMenu();
+            }
+        }
+
+        function setupContextMenu() {
+            const menu = document.getElementById('contextMenu');
+            document.addEventListener('click', hideContextMenu);
+            document.getElementById('taskList').addEventListener('contextmenu', (e) => {
+                const item = e.target.closest('.task-item');
+                if (item) {
+                    e.preventDefault();
+                    selectedTaskId = parseInt(item.dataset.id);
+                    menu.style.display = 'block';
+                    menu.style.left = e.pageX + 'px';
+                    menu.style.top = e.pageY + 'px';
+                }
+            });
+        }
+
+        function hideContextMenu() {
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        function showAddDialog() {
+            editingTaskId = null;
+            document.getElementById('dialogTitle').textContent = '添加任务';
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDesc').value = '';
+            document.querySelector('input[name="delay"][value="30"]').checked = true;
+            document.querySelector('input[name="repeat"][value="none"]').checked = true;
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('taskDate').value = today;
+            document.getElementById('taskTime').value = '17:00';
+
+            document.getElementById('dialogOverlay').style.display = 'flex';
+            document.getElementById('taskTitle').focus();
+        }
+
+        function showEditDialog(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+
+            editingTaskId = id;
+            document.getElementById('dialogTitle').textContent = '编辑任务';
+            document.getElementById('taskTitle').value = task.title;
+            document.getElementById('taskDesc').value = task.desc;
+            document.getElementById('taskDate').value = task.date;
+            document.getElementById('taskTime').value = task.time;
+            document.querySelector(`input[name="delay"][value="${task.delay}"]`).checked = true;
+            document.querySelector(`input[name="repeat"][value="${task.repeat}"]`).checked = true;
+            if (task.category) {
+                document.querySelector(`input[name="category"][value="${task.category}"]`).checked = true;
+            }
+
+            document.getElementById('dialogOverlay').style.display = 'flex';
+        }
+
+        function editTask() {
+            if (selectedTaskId) {
+                showEditDialog(selectedTaskId);
+                hideContextMenu();
+            }
+        }
+
+        function closeDialog() {
+            document.getElementById('dialogOverlay').style.display = 'none';
+        }
+
+        
+
+        function selectSoundFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.mp3,.wav,.ogg';
+            input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                    document.getElementById('soundFilePath').value = e.target.files[0].name;
+                }
+            };
+            input.click();
+        }
+
+        function saveTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            if (!title) {
+                alert('请输入任务标题');
+                return;
+            }
+
+            const desc = document.getElementById('taskDesc').value;
+            const date = document.getElementById('taskDate').value;
+            const time = document.getElementById('taskTime').value;
+            const delay = parseInt(document.querySelector('input[name="delay"]:checked').value);
+            const repeat = document.querySelector('input[name="repeat"]:checked').value;
+            const category = document.querySelector('input[name="category"]:checked').value;
+
+            if (editingTaskId) {
+                const task = tasks.find(t => t.id === editingTaskId);
+                if (task) {
+                    task.title = title;
+                    task.desc = desc;
+                    task.date = date;
+                    task.time = time;
+                    task.delay = delay;
+                    task.repeat = repeat;
+                    task.category = category;
+                }
+            } else {
+                tasks.push({
+                    id: Date.now(),
+                    title, desc, date, time, delay, repeat, category,
+                    completed: false
+                });
+            }
+
+            closeDialog();
+            renderTasks();
+        }
+
+        function deleteTask() {
+            if (selectedTaskId && confirm('确定要删除这个任务吗？')) {
+                tasks = tasks.filter(t => t.id !== selectedTaskId);
+                selectedTaskId = null;
+                renderTasks();
+            }
+            hideContextMenu();
+        }
+
+        function demoReminder() {
+            const pendingTask = tasks.find(t => !t.completed && t.delay > 0);
+            if (pendingTask) {
+                showReminder(pendingTask);
+            } else {
+                showReminder(tasks[0]);
+            }
+        }
+
+        function showReminder(task) {
+            reminderTaskId = task.id;
+            document.getElementById('reminderTaskTitle').textContent = task.title;
+
+            const actualTime = getActualTime(task.time, task.delay);
+            document.getElementById('reminderTimeInfo').innerHTML =
+                `原定: ${task.time}${task.delay > 0 ? ' → 实际提醒: <span class="actual">' + actualTime + '</span>' : ''}`;
+
+            document.getElementById('reminderOverlay').style.display = 'flex';
+
+            // 播放提示音（如果支持）
+            if (task.sound) {
+                console.log('播放自定义铃声:', task.sound);
+            }
+        }
+
+        function markDoneFromReminder() {
+            if (reminderTaskId) {
+                const task = tasks.find(t => t.id === reminderTaskId);
+                if (task) {
+                    task.completed = true;
+                    renderTasks();
+                }
+            }
+            document.getElementById('reminderOverlay').style.display = 'none';
+        }
+
+        function remindLater() {
+            if (reminderTaskId) {
+                const task = tasks.find(t => t.id === reminderTaskId);
+                if (task) {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() + 10);
+                    task.date = now.toISOString().split('T')[0];
+                    task.time = now.toTimeString().slice(0, 5);
+                    task.delay = 0;
+                    renderTasks();
+                }
+            }
+            document.getElementById('reminderOverlay').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDialog();
+                document.getElementById('reminderOverlay').style.display = 'none';
+            }
+            if (e.key === 'Enter' && document.getElementById('dialogOverlay').style.display === 'flex') {
+                if (document.activeElement.tagName !== 'TEXTAREA') {
+                    saveTask();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

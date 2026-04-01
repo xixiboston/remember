@@ -1,0 +1,9 @@
+# Remember - 本地提醒工具依赖
+# Python 3.7+ 已包含 tkinter
+
+# Windows 系统通知支持（可选）
+win10toast; platform_system=="Windows"
+
+# 其他依赖使用系统自带工具
+# macOS: afplay (系统自带)
+# Linux: paplay (pulseaudio-utils) 或 notify-send (libnotify-bin)
